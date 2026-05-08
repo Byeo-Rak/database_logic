@@ -214,7 +214,7 @@ def main() -> int:
         total_questions = 0
         total_images = 0
         for exam in file_sets:
-            questions = load_questions(exam.csv_path)
+            questions = load_questions(exam.excel_path)
             page_questions_map = build_page_questions_map(exam.txt_path)
             question_images, unassigned_images = assign_images_to_questions(
                 image_dir=exam.image_dir,

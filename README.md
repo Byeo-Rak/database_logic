@@ -50,6 +50,15 @@ python3 scripts/pdf_to_text.py --fail-fast
 - `.xlsx`: `.csv`와 동일한 구조를 가진 엑셀 파일
 - `output/images/...`: 페이지별 추출 이미지(`page_###_img_##.<ext>`)
 - `manifest.json`: 원본 PDF 경로, 출력 TXT 경로, 시험 분류, 시험명, 시험일자, 페이지 수, 상태 정보
+- `question_validation.log`: 기대 문제 수 대비 누락 문항 번호 로그(JSON Lines)
+
+누락 파일만 자동 재처리 + 재검증:
+
+```bash
+python3 scripts/reprocess_validation_failures.py
+```
+
+위 스크립트는 `question_validation.log`에 있는 PDF만 다시 처리한 뒤, 여전히 누락된 파일만 로그에 다시 남깁니다.
 
 ## 참고
 
@@ -84,6 +93,15 @@ python3 scripts/upload_to_firebase.py --year 2021 --rounds 1,2,3 --subject-key "
 - `secrets/service-account.json`
 - `secrets/serviceAccountKey.json`
 - `secrets/firebase-service-account.json`
+
+Firebase 업로드는 `.csv`가 아니라 `.xlsx`를 읽습니다. 엑셀에서 수정한 내용이 그대로 반영됩니다.
+엑셀에는 아래 이미지 개수 컬럼이 포함됩니다.
+
+- `문제이미지`
+- `문항1이미지`
+- `문항2이미지`
+- `문항3이미지`
+- `문항4이미지`
 
 - Firestore 경로:
   - `subjects/{subjectKey}` 문서에 `companyList` 맵 저장

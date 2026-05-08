@@ -9,6 +9,7 @@ class ExamFileSet:
     stem: str
     date: str
     csv_path: Path
+    excel_path: Path
     txt_path: Path
     image_dir: Path
     round_no: int

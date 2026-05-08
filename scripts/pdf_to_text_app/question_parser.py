@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 
-def clean_question_text(raw_text: str) -> str:
+def clean_question_text(raw_text: str, aggressive_split: bool = False) -> str:
     lines: list[str] = []
     for line in raw_text.splitlines():
         stripped = line.strip()
@@ -22,6 +22,9 @@ def clean_question_text(raw_text: str) -> str:
     # PDF 추출 과정에서 숫자가 붙는 경우(예: 10129., 379.)를 분리해 문제 번호 인식을 돕는다.
     text = re.sub(r"(?<=\d{2})(?=(\d{2}\.\s))", " ", text)
     text = re.sub(r"([④❹]\s*\d)(\d{2}\.\s)", r"\1 \2", text)
+    if aggressive_split:
+        text = re.sub(r"(?<=\d)(?=(\d{1,3}\.\s))", " ", text)
+        text = re.sub(r"([④❹]\s*\d)\s*(\d{1,3}\.\s)", r"\1 \2", text)
     return text
 
 
@@ -39,8 +42,12 @@ def normalize_compact(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
-def parse_questions_from_text(raw_text: str) -> list[dict[str, str]]:
-    cleaned = clean_question_text(raw_text)
+def parse_questions_from_text(
+    raw_text: str,
+    expected_count: int | None = None,
+    aggressive_split: bool = False,
+) -> list[dict[str, str]]:
+    cleaned = clean_question_text(raw_text, aggressive_split=aggressive_split)
     subject_map = extract_subject_map(raw_text)
     question_pattern = re.compile(r"(?<!\d)(\d{1,3})\.\s*(.*?)(?=(?<!\d)(\d{1,3})\.\s|$)")
     option_pattern = re.compile(
@@ -95,13 +102,27 @@ def parse_questions_from_text(raw_text: str) -> list[dict[str, str]]:
     if not sorted_numbers:
         return []
 
-    under_100 = [number for number in sorted_numbers if number <= 100]
-    if under_100:
-        max_reasonable = max(under_100)
+    if expected_count is not None and expected_count > 0:
+        max_reasonable = expected_count
     else:
-        max_reasonable = max(sorted_numbers)
+        under_100 = [number for number in sorted_numbers if number <= 100]
+        if under_100:
+            max_reasonable = max(under_100)
+        else:
+            max_reasonable = max(sorted_numbers)
     filtered = [
         deduped_by_number[number] for number in sorted_numbers if number <= max_reasonable
     ]
     return filtered
+
+
+def get_missing_question_numbers(
+    questions: list[dict[str, str]], expected_count: int
+) -> list[int]:
+    if expected_count <= 0:
+        return []
+    found_numbers = {
+        int(row["번호"]) for row in questions if row.get("번호", "").isdigit()
+    }
+    return [number for number in range(1, expected_count + 1) if number not in found_numbers]
 

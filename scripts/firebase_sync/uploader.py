@@ -70,6 +70,19 @@ def build_slot_payload(text: str, image_count: int) -> dict[str, object]:
     }
 
 
+def parse_image_count_from_row(
+    row: dict[str, str], key: str, fallback_count: int
+) -> int:
+    raw = row.get(key, "").strip()
+    if not raw:
+        return fallback_count
+    try:
+        parsed = int(float(raw))
+    except ValueError:
+        return fallback_count
+    return parsed if parsed >= 0 else 0
+
+
 def init_firebase_app(
     storage_bucket: str, dry_run: bool, service_account_path: Path | None = None
 ):
@@ -181,11 +194,36 @@ def upload_exam_to_firebase(
 
         question_payload = {
             "number": question_no,
-            "question": build_slot_payload(row.get("질문", ""), len(slot_paths["question"])),
-            "option1": build_slot_payload(row.get("문항1", ""), len(slot_paths["option1"])),
-            "option2": build_slot_payload(row.get("문항2", ""), len(slot_paths["option2"])),
-            "option3": build_slot_payload(row.get("문항3", ""), len(slot_paths["option3"])),
-            "option4": build_slot_payload(row.get("문항4", ""), len(slot_paths["option4"])),
+            "question": build_slot_payload(
+                row.get("질문", ""),
+                parse_image_count_from_row(
+                    row, "문제이미지", len(slot_paths["question"])
+                ),
+            ),
+            "option1": build_slot_payload(
+                row.get("문항1", ""),
+                parse_image_count_from_row(
+                    row, "문항1이미지", len(slot_paths["option1"])
+                ),
+            ),
+            "option2": build_slot_payload(
+                row.get("문항2", ""),
+                parse_image_count_from_row(
+                    row, "문항2이미지", len(slot_paths["option2"])
+                ),
+            ),
+            "option3": build_slot_payload(
+                row.get("문항3", ""),
+                parse_image_count_from_row(
+                    row, "문항3이미지", len(slot_paths["option3"])
+                ),
+            ),
+            "option4": build_slot_payload(
+                row.get("문항4", ""),
+                parse_image_count_from_row(
+                    row, "문항4이미지", len(slot_paths["option4"])
+                ),
+            ),
             "answer": row.get("정답", ""),
             "course": {"id": course_id, "name": course_name},
             "updatedAt": now,

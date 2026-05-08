@@ -80,6 +80,7 @@ def discover_exam_files(
     rounds: set[int],
 ) -> list[ExamFileSet]:
     csv_dir = project_root / "output" / "csv" / subject_key
+    excel_dir = project_root / "output" / "excel" / subject_key
     txt_dir = project_root / "output" / "text" / subject_key
     image_root = project_root / "output" / "images" / subject_key
 
@@ -104,8 +105,11 @@ def discover_exam_files(
     csv_candidates.sort(key=lambda item: item[0])
     discovered: list[ExamFileSet] = []
     for idx, (date, stem, csv_path) in select_by_rounds(csv_candidates, rounds):
+        excel_path = excel_dir / f"{stem}.xlsx"
         txt_path = txt_dir / f"{stem}.txt"
         image_dir = image_root / stem
+        if not excel_path.exists():
+            raise FileNotFoundError(f"Excel not found for {stem}: {excel_path}")
         if not txt_path.exists():
             raise FileNotFoundError(f"TXT not found for {stem}: {txt_path}")
         if not image_dir.exists():
@@ -116,6 +120,7 @@ def discover_exam_files(
                 stem=stem,
                 date=date,
                 csv_path=csv_path,
+                excel_path=excel_path,
                 txt_path=txt_path,
                 image_dir=image_dir,
                 round_no=idx,
@@ -130,10 +135,37 @@ def discover_exam_files(
     return discovered
 
 
-def load_questions(csv_path: Path) -> list[dict[str, str]]:
-    with csv_path.open("r", encoding="utf-8-sig", newline="") as fp:
-        reader = csv.DictReader(fp)
-        return [dict(row) for row in reader]
+def load_questions(excel_path: Path) -> list[dict[str, str]]:
+    try:
+        from openpyxl import load_workbook
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "openpyxl is not installed. Run `pip install -r requirements.txt` first."
+        ) from exc
+
+    workbook = load_workbook(excel_path, data_only=True)
+    sheet = workbook.active
+    rows = list(sheet.iter_rows(values_only=True))
+    if not rows:
+        return []
+
+    headers = [str(cell).strip() if cell is not None else "" for cell in rows[0]]
+    loaded: list[dict[str, str]] = []
+    for values in rows[1:]:
+        row = {
+            headers[idx]: ("" if value is None else str(value).strip())
+            for idx, value in enumerate(values)
+            if idx < len(headers) and headers[idx]
+        }
+        number_raw = row.get("번호", "")
+        if not number_raw.isdigit():
+            continue
+        # 번호만 있고 나머지가 빈칸인 템플릿 행은 업로드에서 제외한다.
+        payload_fields = ["질문", "문항1", "문항2", "문항3", "문항4", "정답"]
+        if not any(row.get(field, "") for field in payload_fields):
+            continue
+        loaded.append(row)
+    return loaded
 
 
 def build_page_questions_map(txt_path: Path) -> dict[int, list[int]]:

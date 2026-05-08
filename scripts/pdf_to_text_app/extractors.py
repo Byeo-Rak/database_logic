@@ -76,7 +76,12 @@ def extract_pdf_images(
     saved_files: list[str] = []
 
     for page_index, page in enumerate(reader.pages, start=1):
-        page_images = list(page.images)
+        try:
+            page_images = list(page.images)
+        except Exception:
+            # 일부 PDF는 이미지 객체 파싱 도중 pypdf 내부 assertion이 발생할 수 있다.
+            # 이 경우 해당 페이지 이미지는 건너뛰고 나머지 처리를 계속 진행한다.
+            continue
         for image_index, image_item in enumerate(page_images, start=1):
             image_name = getattr(image_item, "name", f"image_{image_index}")
             image_data = getattr(image_item, "data", b"")

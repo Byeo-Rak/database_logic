@@ -6,6 +6,13 @@ from dataclasses import dataclass
 
 PDF_NAME_PATTERN = re.compile(r"^(?P<exam_name>.+?)(?P<exam_date>\d{8})")
 QUESTION_FIELDS = ["번호", "질문", "문항1", "문항2", "문항3", "문항4", "정답", "과목"]
+EXCEL_IMAGE_COUNT_FIELDS = [
+    "문제이미지",
+    "문항1이미지",
+    "문항2이미지",
+    "문항3이미지",
+    "문항4이미지",
+]
 
 
 @dataclass
@@ -21,6 +28,9 @@ class ExtractionResult:
     pages: int
     text_chars: int
     question_count: int
+    question_expected_count: int | None
+    missing_question_numbers: list[int]
+    reparsed_with_retry: bool
     image_count: int
     image_files: list[str]
     status: str
