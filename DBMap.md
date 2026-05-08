@@ -1,0 +1,21 @@
+### 과목명
+
+- 정보처리기사(정처기) - InfoProcessEngineer
+    - 소프트웨어 설계 - SoftwareDesign
+    - 소프트웨어 개발 - SoftwareDev
+    - 데이터베이스 구축 - DatabaseCons
+    - 프로그래밍 언어 활용 - ProgramLangUtil
+    - 정보시스템 구축관리 - InfoSystemConstManag
+- 컴퓨터활용능력(컬활1급) - ComputSkillsLV1
+    - 컴퓨터 일반 - GenComp
+    - 스프레드시트 일반 - GenSpread
+    - 데이터베이스 일반 - GenDatabase
+- 컴퓨터활용능력(컬활2급) - ComputSkillsLV2
+    - 컴퓨터 일반 - GenComp
+    - 스프레드시트 일반 - GenSpread
+- 산업안전기사 - IndustrySafetyEnginner
+    - 안전관리론 - SafetyManagTheory
+    - 인간공학 및 시스템안전공학 - ErgSysSafetyEnginner
+    - 기계위험방지기술 - MecHazPrevTechno
+    - 전기위험방지기술 - ElecHazaPrevenTechno
+    - 화학설비위험방지기술 - ChemFaciliHazPrevTechno

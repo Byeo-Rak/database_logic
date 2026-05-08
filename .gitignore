@@ -2,3 +2,4 @@
 .venv
 .env
 /실기 시험
+service-account.json

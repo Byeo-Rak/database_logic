@@ -55,3 +55,43 @@ python3 scripts/pdf_to_text.py --fail-fast
 
 - 현재 스크립트는 텍스트 레이어가 있는 PDF를 대상으로 합니다.
 - 스캔 이미지 PDF라면 OCR 단계(`pytesseract`, `ocrmypdf` 등)를 별도로 붙여야 합니다.
+
+## 코드 구조
+
+- `scripts/pdf_to_text.py`: 실행 엔트리포인트
+- `scripts/pdf_to_text_app/cli.py`: CLI 인자 파싱
+- `scripts/pdf_to_text_app/pipeline.py`: 전체 처리 흐름 오케스트레이션
+- `scripts/pdf_to_text_app/extractors.py`: PDF 텍스트/이미지 추출
+- `scripts/pdf_to_text_app/question_parser.py`: 문제/선지 파싱
+- `scripts/pdf_to_text_app/writers.py`: CSV/XLSX/manifest 쓰기
+- `scripts/pdf_to_text_app/paths.py`: 경로/메타데이터 유틸
+- `scripts/pdf_to_text_app/models.py`: 공용 데이터 모델 및 상수
+
+## Firebase 업로드
+
+Firestore + Storage로 업로드하려면 서비스 계정 인증이 필요합니다.
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS="/absolute/path/to/service-account.json"
+python3 scripts/upload_to_firebase.py --year 2021 --rounds 1,2,3 --subject-key "정처기" --company-key "CBT"
+```
+
+환경변수 없이 바로 실행하려면, 아래 파일명 중 하나로 서비스 계정 키를 두면 자동 인식됩니다.
+
+- `service-account.json`
+- `serviceAccountKey.json`
+- `firebase-service-account.json`
+- `secrets/service-account.json`
+- `secrets/serviceAccountKey.json`
+- `secrets/firebase-service-account.json`
+
+- Firestore 경로:
+  - `subjects/{subjectKey}` 문서에 `companyList` 맵 저장
+  - `subjects/{subjectKey}/companies/{companyKey}` 문서에 `roundList`, `questionSetList` 저장
+  - `subjects/{subjectKey}/companies/{companyKey}/questionSets/{year-round-과목}` 문서에 문제 저장
+- 각 `questionSets` 문서 안에 `questions` 맵(`"001"`, `"002"` ...)
+- 각 문제는 `question`, `option1`~`option4` 구조를 가지며, 각 항목별 `hasImage`(0/1), `imageUrls` 보유
+- 이미지 경로: `{subjectKey}/{companyKey}/{year-round}/{과목}/{문항번호}/{파일명}`
+- 실제 업로드 전 검증: `--dry-run`
+- 기본값은 `2021년`, `1,2,3회차`, `PDF 자동생성 on`, `이미지 JPG 변환 on`입니다.
+- 기본 동작을 끄려면 `--no-build-from-pdf --no-convert-images-to-jpg --no-pdf-skip-existing` 사용
