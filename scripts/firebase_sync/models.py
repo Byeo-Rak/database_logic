@@ -8,7 +8,7 @@ from pathlib import Path
 class ExamFileSet:
     stem: str
     date: str
-    csv_path: Path
+    csv_path: Path | None  # CSV는 더 이상 사용하지 않음
     excel_path: Path
     txt_path: Path
     image_dir: Path

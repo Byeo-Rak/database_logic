@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 import mimetypes
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .id_mapper import resolve_course_id
 from .models import ExamFileSet
+
+# 새로운 Firebase Storage 스타일 이미지 경로 패턴
+# 경로: images/{cert}/{company}/{round-subject}/{qno}/question-1.jpg
+FIREBASE_IMAGE_PATH_PATTERN = re.compile(
+    r"[/\\](?P<qno>\d{3})[/\\](?P<slot>question|option[1-4])-(?P<idx>\d+)"
+)
 
 
 def sanitize_path_segment(value: str) -> str:
@@ -39,6 +46,11 @@ def build_question_set_doc_id(round_id: str, course_id: str) -> str:
 
 
 def split_image_paths_by_slot(image_paths: list[Path]) -> dict[str, list[Path]]:
+    """이미지 경로를 슬롯별로 분류합니다.
+    
+    신규 형식(images/.../001/question-1.jpg)이 있으면 경로 기반으로 분류하고,
+    구버전 형식은 순서 기반으로 분류합니다.
+    """
     slot_paths = {
         "question": [],
         "option1": [],
@@ -49,6 +61,24 @@ def split_image_paths_by_slot(image_paths: list[Path]) -> dict[str, list[Path]]:
     if not image_paths:
         return slot_paths
 
+    # 신규 형식 확인 (경로 기반)
+    has_new_format = any(
+        FIREBASE_IMAGE_PATH_PATTERN.search(str(path).replace("\\", "/")) 
+        for path in image_paths
+    )
+    
+    if has_new_format:
+        # 경로 기반 분류
+        for path in image_paths:
+            path_str = str(path).replace("\\", "/")
+            match = FIREBASE_IMAGE_PATH_PATTERN.search(path_str)
+            if match:
+                slot = match.group("slot")
+                if slot in slot_paths:
+                    slot_paths[slot].append(path)
+        return slot_paths
+    
+    # 구버전: 순서 기반 분류
     if len(image_paths) == 1:
         slot_paths["question"] = image_paths
         return slot_paths
@@ -225,6 +255,7 @@ def upload_exam_to_firebase(
                 ),
             ),
             "answer": row.get("정답", ""),
+            "explanation": row.get("해설", "").strip(),
             "course": {"id": course_id, "name": course_name},
             "updatedAt": now,
         }

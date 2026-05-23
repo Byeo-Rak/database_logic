@@ -9,10 +9,15 @@ from pathlib import Path
 from .models import ExamFileSet
 
 
-CSV_NAME_PATTERN = re.compile(r"정보처리기사(?P<date>\d{8})\(교사용\)\.csv$")
+# CSV는 더 이상 사용하지 않음 (Excel만 사용)
 PAGE_MARKER_PATTERN = re.compile(r"\[PAGE\s+(?P<page>\d+)\]")
 QUESTION_NUMBER_PATTERN = re.compile(r"(?<!\d)(\d{1,3})\.\s")
 IMAGE_NAME_PATTERN = re.compile(r"^page_(?P<page>\d{3})_img_(?P<idx>\d{2})")
+# 새로운 Firebase Storage 스타일 이미지 경로 패턴
+# 경로: images/{cert}/{company}/{round-subject}/{qno}/question-1.jpg
+FIREBASE_IMAGE_PATH_PATTERN = re.compile(
+    r"[/\\](?P<qno>\d{3})[/\\](?P<slot>question|option[1-4])-(?P<idx>\d+)"
+)
 
 
 def normalize_nfc(value: str) -> str:
@@ -79,37 +84,34 @@ def discover_exam_files(
     year: int,
     rounds: set[int],
 ) -> list[ExamFileSet]:
-    csv_dir = project_root / "output" / "csv" / subject_key
     excel_dir = project_root / "output" / "excel" / subject_key
     txt_dir = project_root / "output" / "text" / subject_key
     image_root = project_root / "output" / "images" / subject_key
 
-    if not csv_dir.exists():
-        raise FileNotFoundError(f"CSV directory not found: {csv_dir}")
+    if not excel_dir.exists():
+        raise FileNotFoundError(f"Excel directory not found: {excel_dir}")
 
-    csv_candidates: list[tuple[str, str, Path]] = []
-    for csv_path in sorted(csv_dir.glob("*.csv")):
-        match = CSV_NAME_PATTERN.match(csv_path.name)
+    excel_candidates: list[tuple[str, str, Path]] = []
+    for excel_path in sorted(excel_dir.glob("*.xlsx")):
+        # 파일명에서 날짜 추출
+        match = re.search(r"(\d{8})", excel_path.stem)
         if not match:
             continue
-        date = match.group("date")
+        date = match.group(1)
         if not date.startswith(str(year)):
             continue
-        csv_candidates.append((date, csv_path.stem, csv_path))
+        excel_candidates.append((date, excel_path.stem, excel_path))
 
-    if not csv_candidates:
+    if not excel_candidates:
         raise ValueError(
-            f"{year}년 정처기 CSV를 찾지 못했습니다. 현재 경로: {csv_dir}"
+            f"{year}년 {subject_key} Excel을 찾지 못했습니다. 현재 경로: {excel_dir}"
         )
 
-    csv_candidates.sort(key=lambda item: item[0])
+    excel_candidates.sort(key=lambda item: item[0])
     discovered: list[ExamFileSet] = []
-    for idx, (date, stem, csv_path) in select_by_rounds(csv_candidates, rounds):
-        excel_path = excel_dir / f"{stem}.xlsx"
+    for idx, (date, stem, excel_path) in select_by_rounds(excel_candidates, rounds):
         txt_path = txt_dir / f"{stem}.txt"
         image_dir = image_root / stem
-        if not excel_path.exists():
-            raise FileNotFoundError(f"Excel not found for {stem}: {excel_path}")
         if not txt_path.exists():
             raise FileNotFoundError(f"TXT not found for {stem}: {txt_path}")
         if not image_dir.exists():
@@ -119,7 +121,7 @@ def discover_exam_files(
             ExamFileSet(
                 stem=stem,
                 date=date,
-                csv_path=csv_path,
+                csv_path=None,  # CSV는 더 이상 사용하지 않음
                 excel_path=excel_path,
                 txt_path=txt_path,
                 image_dir=image_dir,
@@ -152,11 +154,20 @@ def load_questions(excel_path: Path) -> list[dict[str, str]]:
     headers = [str(cell).strip() if cell is not None else "" for cell in rows[0]]
     loaded: list[dict[str, str]] = []
     for values in rows[1:]:
-        row = {
-            headers[idx]: ("" if value is None else str(value).strip())
-            for idx, value in enumerate(values)
-            if idx < len(headers) and headers[idx]
-        }
+        row = {}
+        for idx, value in enumerate(values):
+            if idx >= len(headers) or not headers[idx]:
+                continue
+            
+            if value is None:
+                row[headers[idx]] = ""
+            else:
+                value_str = str(value).strip()
+                # Excel에서 수식 방지를 위해 추가된 작은따옴표 제거
+                if value_str.startswith("'") and len(value_str) > 1:
+                    value_str = value_str[1:]
+                row[headers[idx]] = value_str
+        
         number_raw = row.get("번호", "")
         if not number_raw.isdigit():
             continue
@@ -195,10 +206,40 @@ def assign_images_to_questions(
     image_dir: Path,
     page_questions_map: dict[int, list[int]],
 ) -> tuple[dict[int, list[Path]], list[Path]]:
-    image_files = sorted(path for path in image_dir.glob("*") if path.is_file())
+    """이미지 파일을 문제 번호별로 그룹화합니다.
+    
+    구버전 형식(page_001_img_01.jpg)과 신규 형식(images/.../001/question-1.jpg) 모두 지원합니다.
+    """
+    # 신규 형식: 디렉토리 구조로 탐색
+    image_files = []
+    for path in image_dir.rglob("*"):
+        if path.is_file():
+            image_files.append(path)
+    
+    image_files = sorted(image_files)
     question_images: dict[int, list[Path]] = defaultdict(list)
     unassigned: list[Path] = []
 
+    # 신규 형식 먼저 확인 (경로 기반)
+    has_new_format = False
+    for path in image_files:
+        path_str = str(path).replace("\\", "/")
+        match = FIREBASE_IMAGE_PATH_PATTERN.search(path_str)
+        if match:
+            has_new_format = True
+            question_no = int(match.group("qno"))
+            question_images[question_no].append(path)
+    
+    # 신규 형식이 있으면 그것을 사용하고, 나머지는 unassigned로 처리
+    if has_new_format:
+        for path in image_files:
+            path_str = str(path).replace("\\", "/")
+            match = FIREBASE_IMAGE_PATH_PATTERN.search(path_str)
+            if not match:
+                unassigned.append(path)
+        return dict(question_images), unassigned
+    
+    # 신규 형식이 없으면 구버전 방식 사용
     grouped_by_page: dict[int, list[tuple[int, Path]]] = defaultdict(list)
     for path in image_files:
         match = IMAGE_NAME_PATTERN.match(path.name)

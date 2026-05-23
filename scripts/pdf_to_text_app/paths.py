@@ -13,6 +13,7 @@ def parse_pdf_metadata(pdf_path: Path) -> tuple[str, str | None]:
 
 
 def build_output_path(input_root: Path, output_root: Path, pdf_path: Path) -> Path:
+    # 과목 폴더까지 포함: output/text/{과목}/파일.txt
     relative = pdf_path.relative_to(input_root).with_suffix(".txt")
     return output_root / relative
 
@@ -20,6 +21,7 @@ def build_output_path(input_root: Path, output_root: Path, pdf_path: Path) -> Pa
 def build_structured_output_path(
     input_root: Path, output_root: Path, pdf_path: Path, suffix: str
 ) -> Path:
+    # 과목 폴더까지 포함: output/{type}/{과목}/파일.{suffix}
     relative = pdf_path.relative_to(input_root).with_suffix(suffix)
     return output_root / relative
 

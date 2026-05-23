@@ -18,11 +18,6 @@ def parse_args() -> argparse.Namespace:
         help="Directory where extracted text files will be stored.",
     )
     parser.add_argument(
-        "--csv-output-dir",
-        default="output/csv",
-        help="Directory where parsed CSV files will be stored.",
-    )
-    parser.add_argument(
         "--excel-output-dir",
         default="output/excel",
         help="Directory where parsed Excel files will be stored.",
