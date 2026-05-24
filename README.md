@@ -38,6 +38,8 @@ python3 scripts/pdf_to_text.py
   - `images/{certificationId}/{companyId}/{roundId-subjectId}/{questionNo}/question-1.jpg`
   - `images/unknown/`: 인식 실패한 이미지 (파일명에 위치 정보 포함)
 
+> **Firebase Storage 업로드 실패 시:** 이미지는 `output/images/` 로컬 경로에 그대로 보존됩니다. Storage 경로와 동일한 디렉토리 구조이므로, 문제 해결 후 재업로드 시 동일한 파일을 사용할 수 있습니다.
+
 예시:
 ```
 output/images/InfoProcessEngineer/CBT/2021-1-SoftwareDesign/001/question-1.jpg
@@ -171,6 +173,16 @@ python3 scripts/report_explanation_errors.py
 - `secrets/firebase-service-account.json`
 
 Firebase 업로드는 `.csv`가 아니라 `.xlsx`를 읽습니다. 엑셀에서 수정한 내용이 그대로 반영됩니다.
+
+### 업로드 실패 시 폴백 저장 위치
+
+| 데이터 종류 | 정상 저장 위치 | 업로드 실패 시 보존 위치 |
+|------------|--------------|------------------------|
+| 문제 데이터 (Firestore) | `certifications/{certificationId}/CBT/{docId}` | `output/excel/{과목명}/*.xlsx` |
+| 이미지 (Storage) | `certifications/{certificationId}/{companyId}/{questionSetId}/{questionNo}/` | `output/images/{certificationId}/{companyId}/{questionSetId}/{questionNo}/` |
+| 과목 인식 실패 이미지 | — | `output/images/unknown/` (파일명에 페이지·문제번호 포함) |
+
+업로드 실패 원인(네트워크 오류, 인증 만료, 용량 초과 등) 해결 후 `upload_to_firebase.py`를 재실행하면 로컬에 보존된 파일이 그대로 사용됩니다. 특정 연도·회차만 재업로드하려면 `--year`, `--rounds`, `--subject-key` 옵션을 조합하세요.
 엑셀에는 아래 이미지 개수 컬럼이 포함됩니다.
 
 - `문제이미지`

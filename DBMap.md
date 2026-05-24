@@ -152,6 +152,24 @@ certifications/InfoProcessEngineer/CBT/2021-1-SoftwareDesign/001/question-1.jpg
 certifications/InfoProcessEngineer/CBT/2021-1-SoftwareDesign/001/option1-1.jpg
 ```
 
+### Storage 업로드 실패 시 폴백 저장 위치
+
+Firebase Storage에 정상적으로 저장되지 않을 경우, 이미지는 로컬 `output/images/` 디렉토리에 남아 있습니다. 로컬 경로는 Firebase Storage 경로와 동일한 구조를 따릅니다.
+
+| 상황 | 저장 위치 |
+|------|-----------|
+| 정상 업로드 | Firebase Storage (`certifications/{certificationId}/...`) |
+| 업로드 실패 (네트워크/권한 오류 등) | 로컬 `output/images/{certificationId}/{companyId}/{questionSetId}/{questionNo}/` |
+| 과목 인식 실패로 경로 결정 불가 | 로컬 `output/images/unknown/` (파일명에 위치 정보 포함) |
+
+**`output/images/unknown/` 파일명 규칙:**
+```
+{원본파일명}_page{페이지번호:03d}_q{인식된문제번호}_img{이미지순서:02d}.{ext}
+예시: 산업안전기사20210515(교사용)_page001_q144_img04.jpg
+```
+
+> Firestore 문제 데이터(questions 맵)는 업로드 실패 시 `output/excel/{과목명}/` 내 `.xlsx` 파일에 보존됩니다. 재업로드 시 해당 엑셀 파일을 그대로 사용하면 됩니다.
+
 ---
 
 ## 7. Admin Page에서 수정할 Firestore 경로
@@ -191,9 +209,13 @@ await docRef.set({
 PDF 파일
   ↓ scripts/pdf_to_text.py
 output/excel/{subject}/*.xlsx   ← 번호, 질문, 문항1~4, 정답, 과목 컬럼
+output/images/{certificationId}/{companyId}/{questionSetId}/{questionNo}/   ← 추출 이미지 (로컬 보관)
+output/images/unknown/   ← 과목 인식 실패 이미지 (파일명에 위치 정보 포함)
   ↓ scripts/generate_explanations.py  (.env의 gpt_api_key 사용)
 output/excel/{subject}/*.xlsx   ← 해설 컬럼 추가 (GPT 생성, 실패 시 "ai 해설 오류")
   ↓ scripts/upload_to_firebase.py
-Firestore certifications/{...}/CBT/{...}  ← questions 맵으로 저장
-Firebase Storage  ← 이미지 파일
+Firestore certifications/{...}/CBT/{...}  ← questions 맵으로 저장  [실패 시: output/excel/*.xlsx 보존]
+Firebase Storage  ← 이미지 파일  [실패 시: output/images/ 로컬 폴더 보존]
 ```
+
+> **업로드 실패 시 재시도:** `output/excel/`의 엑셀 파일과 `output/images/`의 이미지 파일이 그대로 남아 있으므로, 문제 원인 해결 후 `upload_to_firebase.py`를 재실행하면 됩니다.
